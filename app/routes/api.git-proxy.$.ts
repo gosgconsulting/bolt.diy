@@ -78,7 +78,7 @@ async function handleProxyRequest(request: Request, path: string | undefined) {
 
     try {
       normalizedPath = decodeURIComponent(path);
-    } catch (_) {
+    } catch {
       // Ignore decode errors, fallback to original
     }
 

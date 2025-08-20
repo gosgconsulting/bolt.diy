@@ -84,13 +84,16 @@ export function useGit() {
        * This avoids potential issues with our manual initialization
        */
 
+      // Normalize the repository URL once and reuse
+      const normalizedUrl = normalizeGitUrl(repoUrl);
+
       const headers: {
         [x: string]: string;
       } = {
         'User-Agent': 'bolt.diy',
       };
 
-      const auth = lookupSavedPassword(url);
+      const auth = lookupSavedPassword(normalizedUrl);
 
       if (auth) {
         headers.Authorization = `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}`;
@@ -103,13 +106,11 @@ export function useGit() {
           console.log(`Retrying git clone (attempt ${retryCount + 1})...`);
         }
 
-        const url = normalizeGitUrl(repoUrl);
-
         await git.clone({
           fs,
           http,
           dir: webcontainer.workdir,
-          url,
+          url: normalizedUrl,
           depth: 1,
           singleBranch: true,
           corsProxy: '/api/git-proxy',
@@ -176,7 +177,7 @@ export function useGit() {
 
           // Retry for network errors, up to 3 times
           if (retryCount < 3) {
-            return gitClone(url, retryCount + 1);
+            return gitClone(repoUrl, retryCount + 1);
           }
 
           throw new Error(

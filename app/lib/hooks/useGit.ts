@@ -42,8 +42,37 @@ export function useGit() {
     });
   }, []);
 
+  const normalizeGitUrl = (input: string) => {
+    let url = (input || '').trim();
+
+    /*
+     * Convert SSH-like syntax to HTTPS
+     * e.g., git@github.com:user/repo.git -> https://github.com/user/repo.git
+     */
+    const sshMatch = url.match(/^git@([^:]+):(.+)$/i);
+
+    if (sshMatch) {
+      url = `https://${sshMatch[1]}/${sshMatch[2]}`;
+    }
+
+    // Force https scheme
+    url = url.replace(/^http:\/\//i, 'https://');
+
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+
+    // Ensure it ends with .git (GitHub/GitLab smart protocol expects .git repo URL)
+    if (!/\.git$/i.test(url)) {
+      url = url.replace(/\/?$/, '');
+      url = `${url}.git`;
+    }
+
+    return url;
+  };
+
   const gitClone = useCallback(
-    async (url: string, retryCount = 0) => {
+    async (repoUrl: string, retryCount = 0) => {
       if (!webcontainer || !fs || !ready) {
         throw new Error('Webcontainer not initialized. Please try again later.');
       }
@@ -73,6 +102,8 @@ export function useGit() {
           await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
           console.log(`Retrying git clone (attempt ${retryCount + 1})...`);
         }
+
+        const url = normalizeGitUrl(repoUrl);
 
         await git.clone({
           fs,
@@ -158,6 +189,13 @@ export function useGit() {
           toast.error(`Unauthorized access to repository. Please connect your GitHub account with proper permissions.`);
           throw new Error(
             `Unauthorized access to repository. Please connect your GitHub account with proper permissions.`,
+          );
+        } else if (errorMessage.includes("smart' HTTP protocol") || errorMessage.includes('git-upload-pack')) {
+          toast.error(
+            'Failed to clone repository. Please ensure the URL uses HTTPS and ends with .git (e.g., https://github.com/<owner>/<repo>.git).',
+          );
+          throw new Error(
+            'Smart HTTP protocol not detected. Normalize the URL to include https:// and .git, then try again.',
           );
         } else {
           toast.error(`Failed to clone repository: ${errorMessage}`);

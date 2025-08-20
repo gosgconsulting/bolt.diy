@@ -12,6 +12,7 @@ const ALLOW_HEADERS = [
   'connection',
   'content-length',
   'content-type',
+  'git-protocol',
   'dnt',
   'pragma',
   'range',
@@ -30,6 +31,7 @@ const EXPOSE_HEADERS = [
   'content-length',
   'content-language',
   'content-type',
+  'git-protocol',
   'date',
   'etag',
   'expires',
@@ -71,8 +73,20 @@ async function handleProxyRequest(request: Request, path: string | undefined) {
       });
     }
 
-    // Extract domain and remaining path
-    const parts = path.match(/([^\/]+)\/?(.*)/);
+    // Normalize path: decode URI, strip protocol (http/https), and extract domain + path
+    let normalizedPath = path;
+
+    try {
+      normalizedPath = decodeURIComponent(path);
+    } catch (_) {
+      // Ignore decode errors, fallback to original
+    }
+
+    // Remove leading protocol if present (e.g., https://github.com/...)
+    normalizedPath = normalizedPath.replace(/^https?:\/\//i, '');
+
+    // Now extract domain and remaining path
+    const parts = normalizedPath.match(/^([^\/]+)\/?(.*)$/);
 
     if (!parts) {
       return json({ error: 'Invalid path format' }, { status: 400 });
@@ -97,7 +111,7 @@ async function handleProxyRequest(request: Request, path: string | undefined) {
       }
     }
 
-    // Set the host header
+    // Set the host header (may be ignored by some runtimes, but harmless)
     headers.set('Host', domain);
 
     // Set Git user agent if not already present

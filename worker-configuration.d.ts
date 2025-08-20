@@ -1,3 +1,5 @@
+type Settings = string;
+
 interface Env {
   RUNNING_IN_DOCKER: Settings;
   DEFAULT_NUM_CTX: Settings;

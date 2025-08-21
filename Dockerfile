@@ -1,7 +1,17 @@
 ARG BASE=node:20.18.0
+ARG LOGO_LIGHT=public/logo-light-styled.png
+ARG LOGO_DARK=public/logo-dark-styled.png
+ARG FAVICON_SVG=public/favicon.svg
+ARG FAVICON_ICO=public/favicon.ico
 FROM ${BASE} AS base
 
 WORKDIR /app
+
+# Branding asset build args (redeclared for this stage to be accessible)
+ARG LOGO_LIGHT
+ARG LOGO_DARK
+ARG FAVICON_SVG
+ARG FAVICON_ICO
 
 # Install dependencies (this step is cached as long as the dependencies don't change)
 COPY package.json pnpm-lock.yaml ./
@@ -24,6 +34,12 @@ RUN if [ -f ./assets/branding/sparti/logo-light.png ]; then \
     if [ -f ./assets/branding/sparti/logo-dark.png ]; then \
       cp ./assets/branding/sparti/logo-dark.png ./public/logo-dark-styled.png; \
     fi
+
+ # Branding overrides via build args (applied last so they persist)
+ COPY ${LOGO_LIGHT} ./public/logo-light-styled.png
+ COPY ${LOGO_DARK} ./public/logo-dark-styled.png
+ COPY ${FAVICON_SVG} ./public/favicon.svg
+ COPY ${FAVICON_ICO} ./public/favicon.ico
 
 # Expose the port the app runs on
 EXPOSE 5173

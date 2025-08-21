@@ -10,32 +10,53 @@ interface ModelsResponse {
   defaultProvider: ProviderInfo;
 }
 
-let cachedProviders: ProviderInfo[] | null = null;
-let cachedDefaultProvider: ProviderInfo | null = null;
+function getProviderInfo(
+  llmManager: LLMManager,
+  options: {
+    apiKeys?: Record<string, string>;
+    serverEnv?: Record<string, string>;
+  },
+) {
+  const { apiKeys, serverEnv } = options;
+  const allProviders = llmManager.getAllProviders();
 
-function getProviderInfo(llmManager: LLMManager) {
-  if (!cachedProviders) {
-    cachedProviders = llmManager.getAllProviders().map((provider) => ({
+  // Only expose providers that have configuration (env on server or user API key in cookies)
+
+  const filteredProviders: ProviderInfo[] = allProviders
+    .filter((provider) => {
+      const tokenKey = provider.config?.apiTokenKey;
+      if (!tokenKey) {
+        // providers without token requirement stay available
+        return true;
+      }
+
+      const hasKey = Boolean(
+        apiKeys?.[provider.name] ||
+          serverEnv?.[tokenKey] ||
+          (typeof process !== 'undefined' && (process as any)?.env?.[tokenKey]),
+      );
+
+      return hasKey;
+    })
+    .map((provider) => ({
       name: provider.name,
       staticModels: provider.staticModels,
       getApiKeyLink: provider.getApiKeyLink,
       labelForGetApiKey: provider.labelForGetApiKey,
       icon: provider.icon,
     }));
-  }
 
-  if (!cachedDefaultProvider) {
-    const defaultProvider = llmManager.getDefaultProvider();
-    cachedDefaultProvider = {
-      name: defaultProvider.name,
-      staticModels: defaultProvider.staticModels,
-      getApiKeyLink: defaultProvider.getApiKeyLink,
-      labelForGetApiKey: defaultProvider.labelForGetApiKey,
-      icon: defaultProvider.icon,
-    };
-  }
+  // Keep existing default provider selection, UI will correct if it's not in filtered list
+  const dp = llmManager.getDefaultProvider();
+  const defaultProvider: ProviderInfo = {
+    name: dp.name,
+    staticModels: dp.staticModels,
+    getApiKeyLink: dp.getApiKeyLink,
+    labelForGetApiKey: dp.labelForGetApiKey,
+    icon: dp.icon,
+  };
 
-  return { providers: cachedProviders, defaultProvider: cachedDefaultProvider };
+  return { providers: filteredProviders, defaultProvider };
 }
 
 export async function loader({
@@ -58,7 +79,10 @@ export async function loader({
   const apiKeys = getApiKeysFromCookie(cookieHeader);
   const providerSettings = getProviderSettingsFromCookie(cookieHeader);
 
-  const { providers, defaultProvider } = getProviderInfo(llmManager);
+  const { providers, defaultProvider } = getProviderInfo(llmManager, {
+    apiKeys,
+    serverEnv: context.cloudflare?.env,
+  });
 
   let modelList: ModelInfo[] = [];
 

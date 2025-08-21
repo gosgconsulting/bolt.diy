@@ -14,6 +14,17 @@ RUN npm install -g pnpm && pnpm install
 # Copy the rest of your app's source code
 COPY . .
 
+# Optional branding override: if Sparti logos are present in the build context,
+# use them to replace the default Bolt assets without changing app code.
+# Place files at: assets/branding/sparti/logo-light.png (black for light theme)
+# and assets/branding/sparti/logo-dark.png (white for dark theme).
+RUN if [ -f ./assets/branding/sparti/logo-light.png ]; then \
+      cp ./assets/branding/sparti/logo-light.png ./public/logo-light-styled.png; \
+    fi && \
+    if [ -f ./assets/branding/sparti/logo-dark.png ]; then \
+      cp ./assets/branding/sparti/logo-dark.png ./public/logo-dark-styled.png; \
+    fi
+
 # Expose the port the app runs on
 EXPOSE 5173
 
